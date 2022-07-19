@@ -1,0 +1,66 @@
+#!/bin/bash
+set -e 
+trap on_exit EXIT
+
+print_message() {
+  local MESSAGE=${1-""}
+  echo "[INFO] ${MESSAGE}"
+}
+
+print_error() {
+  local MESSAGE=${1-""}
+  echo "[ERROR] ${MESSAGE}"
+}
+
+on_exit() {
+  if [[ $? -eq 0 ]]; then 
+    print_message "Done."
+  else
+    print_error "An error has occurred during installing operator-sdk"
+  fi
+}
+
+# Create a tmp dir if not yet
+TMP_DIR="/tmp/test-operator-sdk"
+[[ ! -d ${TMP_DIR} ]] && print_message "Creating ${TMP_DIR}" && mkdir -p ${TMP_DIR}
+
+# Set operator version
+export OPERATOR_VERSION=${1-"1.22.1"}
+print_message "Operator-sdk version: ${OPERATOR_VERSION}"
+
+
+# Get OS information
+export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+export OS=$(uname | awk '{print tolower($0)}')
+print_message "Detected OS: ${OS}_${ARCH}"
+
+# Set fetch URL for operator-sdk binary
+export OPERATOR_SDK_DL_URL="https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_VERSION}"
+print_message "Fetch URL: ${OPERATOR_SDK_DL_URL}"
+
+# Fetch the binary
+print_message "Downloading..."
+curl -Lo "${TMP_DIR}/operator-sdk" "${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}"
+
+# Checking if binary is successfully downloaded
+if [[ $(cat ${TMP_DIR}/operator-sdk) == "Not Found" ]]; then
+  print_error "operator-sdk v${OPERATOR_VERSION} not found"
+  exit 1
+fi
+print_message "Sucessfully downloaded operator-sdk@${OPERATOR_VERSION} to ${TMP_DIR}/operator-sdk"
+
+# Check sum
+print_message "Import the operator-sdk release GPG key from keyserver.ubuntu.com"
+gpg --keyserver keyserver.ubuntu.com --recv-keys 052996E2A20B5C7E
+
+curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt
+curl -LO ${OPERATOR_SDK_DL_URL}/checksums.txt.asc
+gpg -u "Operator SDK (release) <cncf-operator-sdk@cncf.io>" --verify checksums.txt.asc
+
+grep operator-sdk_${OS}_${ARCH} checksums.txt | sha256sum -c -
+
+# Set executable bit to operator-sdk and add it to /usr/local/bin
+sudo install -o root -g root -m 0755 ${TMP_DIR}/operator-sdk /usr/local/bin/operator-sdk 
+print_message "Installed operator-sdk to /usr/local/bin"
+
+exit 0
