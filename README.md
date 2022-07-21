@@ -1,10 +1,10 @@
-# operator-utilities
+# operator-knowledge-hub
 
-A knowledge hub for k8s/oc operators. This includes documentations and utilities scripts.
+A knowledge hub for k8s/oc operators. This includes documentations and utility scripts.
 
 ## SEE ALSO
 
-[cryostat-operator](https://github.com/cryostatio/cryostat-operator): A Kubernetes Operator to automate deployment of Cryostat and provide an API to manage JDK Flight Recordings
+[cryostat-operator](https://github.com/cryostatio/cryostat-operator): A Kubernetes Operator to automate deployment of Cryostat and provide an API to manage JDK Flight Recordings (deprecated).
 
 ## DOCUMENTATIONS
 
