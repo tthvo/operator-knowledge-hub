@@ -61,19 +61,23 @@ There are 2 ways to deploy the operator to the k8s/openshift cluster.
 
 Any changes to go source files requires building a operator image and modify `OPERATOR_IMG`. The recommended way to test your local changes is manual deployment with `make deploy`.
 
-> If you make changes to the Go sources, you'd need to build and push a custom operator image and pass that to make deploy with the OPERATOR_IMG variable.
+> If you make changes to the Go sources, you'd need to build and push a custom operator image and pass that to make deploy with the OPERATOR_IMG variable. 
 
 ```bash
-# Setting up env
-IMAGE_VERSION="2.2.0-dev" # Tag
-IMAGE_NAMESPACE="quay.io/thvo" # Quay registry
-OPERATOR_NAME="cryostat-operator"
+# Before building and deploying
+# Setting up env (set to default values in your operator Makefile, overwrite with these values in your shell or in the Makefile itself)
+export IMAGE_VERSION="2.2.0-dev" # Tag
+export IMAGE_NAMESPACE="quay.io/{YOUR_QUAY_USERNAME}" # Quay registry, e.g. "quay.io/thvo" or "quay.io/macao"
+export OPERATOR_NAME="cryostat-operator"
+export DEPLOY_NAMESPACE="default" 
 
 # Build and push the image to remote registry
-make oci-build && podman image prune -f && podman push $IMAGE_NAMESPACE/cryostat-operator:$IMAGE_VERSION
+make oci-build && \
+podman image prune -f && \
+podman push $IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION
 
 # Deploy the running cluster
-make deploy OPERATOR_IMG=$IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION
+make OPERATOR_IMG=$IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION # or just `make deploy` if env variables were exported
 ```
 
 ## Monitoring
