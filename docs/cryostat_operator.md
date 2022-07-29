@@ -4,6 +4,7 @@ Here are some useful things to know if you are working on https://github.com/cry
 
 ## Prerequisites
 
+### Hardware 
 Minimum hardware requirements to run crc instance ([reference](https://crc.dev/crc/#minimum-system-requirements-hardware_gsg)):
 - 4 physical CPU cores
 - 9 GB of free memory
@@ -11,9 +12,25 @@ Minimum hardware requirements to run crc instance ([reference](https://crc.dev/c
 
 **Note**: Some workload might require more resources, for examples, enabling cluster monitoring.
 
+### Dependencies
+
 CRC requires the `libvirt` and `NetworkManager` packages to run on Linux. On Fedora, you will likely need to:
 ```bash
 sudo dnf install NetworkManager
+```
+
+A [Quay.io](quay.io) account is needed to be able to pull, push, and store container images. Red Hat associates should be able to create an account and sign in with their Red Hat email. Details can be followed [here](https://access.redhat.com/articles/5363231).
+
+In order to pull images from the Quay.io repository, Podman needs to be signed in from a Quay account. More details about [podman-login](https://docs.podman.io/en/latest/markdown/podman-login.1.html).
+
+```bash
+$ podman login quay.io
+Username: # type in your quay.io username (e.g. macao)
+Password: # type in your quay.io password (e.g. myquayiopassword)
+```
+When successful:
+```bash
+Login Succeeded!
 ```
 
 ## Setup/Start CodeReady Container
@@ -54,10 +71,11 @@ crc start -m 14336 # 14GiB (recommended for core functionality)
 There are 2 ways to deploy the operator to the k8s/openshift cluster.
 
 1. Manual deployment with `make deploy`. This way you can test our your changes to configuration files (i.e. `*.yaml`) with `crc`.
-2. Bundle deployment with `make deploy_bundle` (OLM). Basically YAML definitions in config/ go in the bundle image, Go code goes in the operator image. Note that:
+2. Bundle deployment with `make deploy_bundle` (OLM). Basically YAML definitions in config/ go in the bundle image, Go code goes in the operator image. 
+Note that:
 	> OLM runs by default in OpenShift Container Platform 4.7.
 
-## Local changes
+## Local testing
 
 Any changes to go source files requires building a operator image and modify `OPERATOR_IMG`. The recommended way to test your local changes is manual deployment with `make deploy`.
 
@@ -67,7 +85,7 @@ Any changes to go source files requires building a operator image and modify `OP
 # Before building and deploying
 # Setting up env (set to default values in your operator Makefile, overwrite with these values in your shell or in the Makefile itself)
 export IMAGE_VERSION="2.2.0-dev" # Tag
-export IMAGE_NAMESPACE="quay.io/{YOUR_QUAY_USERNAME}" # Quay registry, e.g. "quay.io/thvo" or "quay.io/macao"
+export IMAGE_NAMESPACE="quay.io/$YOUR_QUAY_USERNAME" # Quay registry, e.g. "quay.io/thvo" or "quay.io/macao"
 export OPERATOR_NAME="cryostat-operator"
 export DEPLOY_NAMESPACE="default" 
 
@@ -80,6 +98,65 @@ podman push $IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION
 make OPERATOR_IMG=$IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION # or just `make deploy` if env variables were exported
 ```
 
+## Local bundle testing with OLM
+_Note: crc is known to be very CPU and memory intensive_
+
+0. Make sure all [prerequisites](#prerequisites) have been followed.
+1. Have crc installed, setup, and started as mentioned [above](#setupstart-codeready-container). Run `crc status` and it should look something like this when ready:
+	```bash
+	$ crc status
+	CRC VM:          Running
+	OpenShift:       Running (v4.10.14)
+	Podman:          
+	Disk Usage:      21.72GB of 32.74GB (Inside the CRC VM)
+	Cache Usage:     17.07GB
+	Cache Directory: /home/mcao/.crc/cache
+	```
+
+2. Then run `crc console` to open the OpenShift Web Console in your browser and login with your crc credentials. You can see the credentials again by running `crc console --credentials`.
+
+	```bash
+	$ crc console
+	Opening the OpenShift Web Console in the default browser...
+	# Your browser will open up...
+
+	$ crc console --credentials
+	To login as a regular user, run 'oc login -u developer -p developer https://api.crc.testing:6443'.
+	To login as an admin, run 'oc login -u kubeadmin -p SOME_RANDOM_PASSWORD https://api.crc.testing:6443'
+	# Login as an admin on the web UI with your specific credentials, or login with your terminal
+	```
+
+3. Run scripts with your changes in `cryostat-operator` directory.
+	```bash
+	# Set env variables again
+	export IMAGE_VERSION="2.2.0-dev" # current operator version
+	export OPERATOR_IMG="quay.io/$YOUR_QUAY_USERNAME/cryostat-operator:$IMAGE_VERSION"
+	export BUNDLE_IMG="quay.io/$YOUR_QUAY_USERNAME/cryostat-operator-bundle:$IMAGE_VERSION"
+
+	# Build and push image to remote registry
+	make oci-build
+	podman push $OPERATOR_IMG
+
+	# Build and push bundle image to remote registry
+	make bundle 
+	make bundle-build
+	podman push $BUNDLE_IMG
+	make deploy_bundle
+	# Note: Make sure the repositories containing the required images under your Quay namespace are "public" such that images under the repository can be pulled remotely. Otherwise, a 401 UNAUTHORIZED error will occur when deploying the bundle.
+
+	# Then finally create a Cryostat CR
+	make create_cryostat_cr 
+	```
+	Congratulations! You can now see your deployed `Cryostat Operator` under the `Operators` tab under `Installed Operators`. 
+	![operator-installed-seen-on-console](img/openshift-cryostat-bundle.png)  
+
+4. To stop all crc, deployments, and pods cleanly
+	```bash
+	$ crc stop
+
+	# All resources will still be on disk the next time crc is started, unless crc delete is run
+	$ crc delete # optional
+	```
 ## Monitoring
 
 **Note**: `oc` will be the primary cluster client here. To get help, run `oc help`.
