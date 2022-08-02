@@ -1,6 +1,5 @@
 #!/bin/bash
-set -e 
-trap on_exit EXIT
+set -e
 
 # Save current pwd
 CURRENT_PWD=$(pwd)
@@ -16,12 +15,12 @@ print_error() {
 }
 
 on_exit() {
-  cd ${CURRENT_PWD}
   if [[ $? -eq 0 ]]; then 
     print_message "Done."
   else
     print_error "An error has occurred during installing operator-sdk"
   fi
+  cd ${CURRENT_PWD}
 }
 
 exit_on_download_fail() {
@@ -30,6 +29,8 @@ exit_on_download_fail() {
     exit 1
   fi
 }
+
+trap on_exit EXIT
 
 # Create a tmp dir if not yet
 TMP_DIR="/tmp/test-operator-sdk"
