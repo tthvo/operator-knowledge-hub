@@ -3,6 +3,7 @@ set -e
 
 # Save current pwd
 CURRENT_PWD=$(pwd)
+TMP_DIR="/tmp/test-operator-sdk"
 
 print_message() {
   local MESSAGE=${1-""}
@@ -21,6 +22,7 @@ on_exit() {
     print_error "An error has occurred during installing operator-sdk"
   fi
   cd ${CURRENT_PWD}
+  rm -rf ${TMP_DIR}
 }
 
 exit_on_download_fail() {
@@ -33,22 +35,20 @@ exit_on_download_fail() {
 trap on_exit EXIT
 
 # Create a tmp dir if not yet
-TMP_DIR="/tmp/test-operator-sdk"
 [[ ! -d ${TMP_DIR} ]] && print_message "Creating ${TMP_DIR}" && mkdir -p ${TMP_DIR}
 cd ${TMP_DIR}
 
 # Set operator version
-export OPERATOR_VERSION=${1-"1.22.1"}
-print_message "Operator-sdk version: ${OPERATOR_VERSION}"
-
+OPERATOR_VERSION="$(sed -e 's/v//' <<< ${1-"1.22.2"})"
+print_message "Operator-sdk version: v${OPERATOR_VERSION}"
 
 # Get OS information
-export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
-export OS=$(uname | awk '{print tolower($0)}')
+ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+OS=$(uname | awk '{print tolower($0)}')
 print_message "Detected OS: ${OS}_${ARCH}"
 
 # Set fetch URL for operator-sdk binary
-export OPERATOR_SDK_DL_URL="https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_VERSION}"
+OPERATOR_SDK_DL_URL="https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_VERSION}"
 print_message "Fetch URL: ${OPERATOR_SDK_DL_URL}"
 
 # Fetch the binary
@@ -79,7 +79,8 @@ print_message "Verifying checksum"
 grep "operator-sdk_${OS}_${ARCH}" checksums.txt | sha256sum -c -
 
 # Set executable bit to operator-sdk and add it to /usr/local/bin
-sudo install -o root -g root -m 0755 operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk 
-print_message "Installed operator-sdk to /usr/local/bin"
+TARGET_DIR=${2-"/usr/local/bin"}
+sudo install -o root -g root -m 0755 operator-sdk_${OS}_${ARCH} ${TARGET_DIR}/operator-sdk 
+print_message "Installed operator-sdk to ${TARGET_DIR}"
 
 exit 0
