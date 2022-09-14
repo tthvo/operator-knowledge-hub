@@ -75,15 +75,15 @@ There are 2 ways to deploy the operator to the k8s/openshift cluster.
 Note that:
 	> OLM runs by default in OpenShift Container Platform 4.7.
 
-## Local testing
+### Local Manual Deployment
 
 Any changes to go source files requires building a operator image and modify `OPERATOR_IMG`. The recommended way to test your local changes is manual deployment with `make deploy`.
 
 > If you make changes to the Go sources, you'd need to build and push a custom operator image and pass that to make deploy with the OPERATOR_IMG variable. 
 
 ```bash
-# Before building and deploying
-# Setting up env (set to default values in your operator Makefile, overwrite with these values in your shell or in the Makefile itself)
+# Before building and deploying, you need to set up env vars
+# If not set, they are default to values defined in Makefile
 export IMAGE_VERSION="2.2.0-dev" # Tag
 export IMAGE_NAMESPACE="quay.io/$YOUR_QUAY_USERNAME" # Quay registry, e.g. "quay.io/thvo" or "quay.io/macao"
 export OPERATOR_NAME="cryostat-operator"
@@ -94,15 +94,14 @@ make oci-build && \
 podman image prune -f && \
 podman push $IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION
 
-# Deploy the running cluster
-make OPERATOR_IMG=$IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION # or just `make deploy` if env variables were exported
+# Deploy to the running cluster
+make OPERATOR_IMG=$IMAGE_NAMESPACE/$OPERATOR_NAME:$IMAGE_VERSION deploy # or just `make deploy` if env variables were exported
 ```
 
-## Local bundle testing with OLM
-_Note: crc is known to be very CPU and memory intensive_
+### Local Bundle Deployment
 
-0. Make sure all [prerequisites](#prerequisites) have been followed.
-1. Have crc installed, setup, and started as mentioned [above](#setupstart-codeready-container). Run `crc status` and it should look something like this when ready:
+1. Make sure all [prerequisites](#prerequisites) have been followed.
+2. Have `crc` installed, setup, and started as mentioned [above](#setupstart-codeready-container). Run `crc status` and it should look something like this when ready:
 	```bash
 	$ crc status
 	CRC VM:          Running
@@ -113,7 +112,7 @@ _Note: crc is known to be very CPU and memory intensive_
 	Cache Directory: /home/mcao/.crc/cache
 	```
 
-2. Then run `crc console` to open the OpenShift Web Console in your browser and login with your crc credentials. You can see the credentials again by running `crc console --credentials`.
+3. Then run `crc console` to open the OpenShift Web Console in your browser and login with your crc credentials. You can see the credentials again by running `crc console --credentials`.
 
 	```bash
 	$ crc console
@@ -126,37 +125,46 @@ _Note: crc is known to be very CPU and memory intensive_
 	# Login as an admin on the web UI with your specific credentials, or login with your terminal
 	```
 
-3. Run scripts with your changes in `cryostat-operator` directory.
+4. Run scripts with your changes in `cryostat-operator` directory.
 	```bash
-	# Set env variables again
-	export IMAGE_VERSION="2.2.0-dev" # current operator version
-	export OPERATOR_IMG="quay.io/$YOUR_QUAY_USERNAME/cryostat-operator:$IMAGE_VERSION"
-	export BUNDLE_IMG="quay.io/$YOUR_QUAY_USERNAME/cryostat-operator-bundle:$IMAGE_VERSION"
+    # Set env variables again
+    export IMAGE_VERSION="2.2.0-dev" # current operator version
+    export OPERATOR_IMG="quay.io/$YOUR_QUAY_USERNAME/cryostat-operator:$IMAGE_VERSION"
+    export BUNDLE_IMG="quay.io/$YOUR_QUAY_USERNAME/cryostat-operator-bundle:$IMAGE_VERSION"
 
-	# Build and push image to remote registry
-	make oci-build
-	podman push $OPERATOR_IMG
+    # Build and push image to remote registry if changed
+    make oci-build && \
+    podman push $OPERATOR_IMG
 
-	# Build and push bundle image to remote registry
-	make bundle 
-	make bundle-build
-	podman push $BUNDLE_IMG
-	make deploy_bundle
-	# Note: Make sure the repositories containing the required images under your Quay namespace are "public" such that images under the repository can be pulled remotely. Otherwise, a 401 UNAUTHORIZED error will occur when deploying the bundle.
+    # Build and push bundle image to remote registry
+    make bundle && \
+    make bundle-build && \
+    podman image prune -f && \
+    podman push $BUNDLE_IMG
 
-	# Then finally create a Cryostat CR
-	make create_cryostat_cr 
+    # Deploy bundle to the running cluster
+    make deploy_bundle  
+
+    # Then finally create a Cryostat CR
+    make create_cryostat_cr 
 	```
-	Congratulations! You can now see your deployed `Cryostat Operator` under the `Operators` tab under `Installed Operators`. 
+
+	Congratulations! You can now see your deployed `Cryostat Operator` under the `Operators` tab under `Installed Operators`.
+
 	![operator-installed-seen-on-console](img/openshift-cryostat-bundle.png)  
 
-4. To stop all crc, deployments, and pods cleanly
+5. To stop all crc, deployments, and pods cleanly
 	```bash
-	$ crc stop
-
-	# All resources will still be on disk the next time crc is started, unless crc delete is run
-	$ crc delete # optional
+	$ crc stop # All resources will still be on disk the next time crc is started, unless crc delete is run
+	$ crc delete # Delete the crc instance and all states will be lost
 	```
+
+### Notes
+
+For `crc` as local cluster, it is known to be very CPU and memory intensive.
+
+Repositories containing the required images under your Quay namespace must be "public". Otherwise, a `401 UNAUTHORIZED` error will occur when deploying the bundle.
+
 ## Monitoring
 
 **Note**: `oc` will be the primary cluster client here. To get help, run `oc help`.
@@ -198,7 +206,7 @@ With the underlying `Kubebuilder` as said in [FAQ](https://sdk.operatorframework
 
 The project structure should be similar. Furthermore, some operator sdk commands are compatible in behavior with its kubebuilder counterpart:
 
-> Just keep in mind that when you see an instruction such as: $ kubebuilder <command> you will use $ operator-sdk <command>
+> Just keep in mind that when you see an instruction such as "kubebuilder \<command\>", you will use "operator-sdk \<command\>".
 
 ### api/v1beta1
 
@@ -270,6 +278,16 @@ Check out links below for information on these annotations:
 ## Testing
 
 An example of test framework setup: https://onsi.github.io/ginkgo/#separating_creation_and_configuration_
+
+### OperatorSDK Tests
+
+Currently, `make bundle` will run the default general testsuite as `operator-sdk bundle validate ./bundle`.
+
+To run tests with a specific suite (e.g `operator-framework`), run:
+
+```bash
+operator-sdk bundle validate ${path-to-bundle} --select-optional suite=operatorframework
+```
 
 ## Release on OperatorHub
 
