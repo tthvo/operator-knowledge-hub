@@ -1,8 +1,10 @@
 #!/bin/bash
+
 DEST=$HOME/tmp/profiling.txt
+WATCHED_NAMESPACE=${1:-"default"}
 
 on_start() {
-  echo "[INFO] Profiling containers in pods..."
+  echo "[INFO] Profiling containers in namespace ${WATCHED_NAMESPACE}"
 }
 
 on_exit() {
