@@ -65,14 +65,29 @@ $ crc start -m 14336 # 14GiB (recommended for core functionality)
 To stop your cluster instance:
 
 ```bash
-$ crc stop
+$ crc stop # All resources will still be on disk the next time crc is started, unless crc delete is run
 ```
 
 To delete your cluster instance:
 ```bash
-$ crc delete
+$ crc delete # Delete the crc instance and all states will be lost
 ```
 
+To enter OpenShift console:
+```bash
+$ crc console
+Opening the OpenShift Web Console in the default browser...
+# Your browser will open up...
+```
+
+If you forget your credentials, run:
+```bash
+$ crc console --credentials
+To login as a regular user, run 'oc login -u developer -p developer https://api.crc.testing:6443'.
+To login as an admin, run 'oc login -u kubeadmin -p SOME_RANDOM_PASSWORD https://api.crc.testing:6443'
+# Login as an admin on the web UI with your specific credentials, or login with your terminal
+```
+	
 ### Cluster Bot
 
 Cluster Bot behaviour and performance is closer to production clusters. 
